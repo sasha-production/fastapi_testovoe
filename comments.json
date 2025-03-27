@@ -1,0 +1,12 @@
+{
+  "comments": [
+    {
+      "id": 1,
+      "news_id": 1,
+      "title": "comment_1",
+      "date": "2024-01-02T21:58:25",
+      "comment": "Comment"
+    }
+  ],
+  "comments_count": 1
+}
