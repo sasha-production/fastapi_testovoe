@@ -1,11 +1,38 @@
 import fastapi
 import uvicorn
 import json
-import typing
-from fastapi import Path, status
+from typing import Dict, List, Optional
+from fastapi import Path, status, Depends
 from fastapi.responses import JSONResponse
+from models import NewsDetailResponse, Comment
 
 app = fastapi.FastAPI()
+
+comments_by_news_id: Dict[int, List[Optional[Comment]]] = {}
+
+
+def load_file(path: str) -> Dict:
+    with open(path, encoding='utf-8') as file:
+        return json.load(file)
+
+
+@app.on_event('startup')
+async def pre_processing():
+    '''
+    Предобработка файла с комментариями.
+    Формирует хеш-таблицу: ключ - id новости, значение - список из комментариев
+    '''
+    comments_data = load_file('comments.json')
+    for comment_dict in comments_data['comments']:
+        news_id = comment_dict['news_id']
+        if comments_by_news_id.get(news_id):
+            comments_by_news_id[news_id].append(Comment(**comment_dict))
+        else:
+            comments_by_news_id[news_id] = [Comment(**comment_dict)]
+
+
+def get_comments_by_news_id(news_id: int) -> List[Optional[Dict]]:
+    return comments_by_news_id[news_id]
 
 
 def get_comments_count_by_id(news_id: int) -> int:
@@ -16,16 +43,6 @@ def get_comments_count_by_id(news_id: int) -> int:
             if comment_info['news_id'] == news_id:
                 comments_count += 1
         return comments_count
-
-
-def get_comments_by_id(news_id) -> list:
-    with open('comments.json', encoding='utf-8') as file:
-        comments_array = json.load(file).get('comments')
-    comments_by_id_array = []
-    for i in range(len(comments_array)):
-        if comments_array[i]['news_id'] == news_id:
-            comments_by_id_array.append(comments_array[i])
-    return comments_by_id_array
 
 
 @app.get('/')
@@ -43,24 +60,20 @@ async def get_all_news():
     return JSONResponse(content=news_data, status_code=status.HTTP_200_OK)
 
 
-@app.get('/news/{id}')
+@app.get('/news/{id}', response_model=NewsDetailResponse)
 async def get_news_by_id(id: int = Path(ge=1)):
-    with open('news.json', encoding='utf-8') as file:
-        news_data = json.load(file)
-    news_info = None
-    for news in news_data.get('news'):
-        if news['id'] == id:
-            news_info = news
-            break
-    else:
-        return JSONResponse(content="No such news", status_code=status.HTTP_404_NOT_FOUND)
+    news_data = load_file('news.json')
+    # если в массиве новости новости начинаются с id=1 и в порядке возрастания, иначе поиск циклом
+    if len(news_data['news']) < id:
+        return JSONResponse(content='No such news', status_code=status.HTTP_404_NOT_FOUND)
+    news_by_id = news_data['news'][id - 1]
+    if news_by_id['deleted']:
+        return JSONResponse(content='The news was deleted', status_code=status.HTTP_404_NOT_FOUND)
 
-    if news_info['deleted']:
-        return JSONResponse(content="The news was deleted", status_code=status.HTTP_404_NOT_FOUND)
-    comments_by_id = get_comments_by_id(news_info['id'])
-    news_info['comments'] = comments_by_id
-    news_info['comments_count'] = len(comments_by_id)
-    return JSONResponse(content=news_info, status_code=status.HTTP_200_OK)
+    comments_by_news_id = get_comments_by_news_id(news_id=id)
+    news_by_id['comments'] = comments_by_news_id
+    news_by_id['comments_count'] = len(comments_by_news_id)
+    return news_by_id
 
 
 if __name__ == '__main__':

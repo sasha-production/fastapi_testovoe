@@ -6,6 +6,20 @@
       "title": "comment_1",
       "date": "2024-01-02T21:58:25",
       "comment": "Comment"
+    },
+    {
+      "id": 2,
+      "news_id": 1,
+      "title": "comment_2",
+      "date": "2024-01-02T21:58:25",
+      "comment": "Comment2"
+    },
+    {
+      "id": 3,
+      "news_id": 2,
+      "title": "comment_x",
+      "date": "2024-01-02T21:58:25",
+      "comment": "Comment"
     }
   ],
   "comments_count": 1
