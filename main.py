@@ -1,10 +1,14 @@
+import os
 import fastapi
 import uvicorn
 import json
+from dotenv import load_dotenv
 from typing import Dict, List, Optional
 from fastapi import Path, status
 from fastapi.responses import JSONResponse
 from models import NewsDetailResponse, Comment, ListNewsResponse, News
+
+load_dotenv()
 
 app = fastapi.FastAPI()
 
@@ -20,14 +24,14 @@ def get_comments_by_news_id(news_id: int) -> List[Optional[Dict]]:
     return comments_by_news_id.get(news_id, [])
 
 
-def get_comments_count_by_id(news_id: int) -> int:
-    with open('comments.json', encoding='utf-8') as file:
-        comments_array = json.load(file).get('comments')
-        comments_count = 0
-        for comment_info in comments_array:
-            if comment_info['news_id'] == news_id:
-                comments_count += 1
-        return comments_count
+# def get_comments_count_by_id(news_id: int) -> int:
+#     with open('comments.json', encoding='utf-8') as file:
+#         comments_array = json.load(file).get('comments')
+#         comments_count = 0
+#         for comment_info in comments_array:
+#             if comment_info['news_id'] == news_id:
+#                 comments_count += 1
+#         return comments_count
 
 
 @app.on_event('startup')
@@ -36,7 +40,7 @@ async def pre_processing() -> None:
     Предобработка файла с комментариями.
     Формирует хеш-таблицу: ключ - id новости, значение - список из комментариев
     '''
-    comments_data = load_file('comments.json')
+    comments_data = load_file(os.getenv("COMMENTS_FILE"))
     for comment_dict in comments_data['comments']:
         news_id = comment_dict['news_id']
         if comments_by_news_id.get(news_id):
@@ -47,7 +51,7 @@ async def pre_processing() -> None:
 
 @app.get('/', response_model=ListNewsResponse)
 async def get_all_news():
-    news_data = load_file('news.json')
+    news_data = load_file(os.getenv("NEWS_FILE"))
     news_not_deleted: List[Optional[News]] = []
     for news_item in news_data['news']:
         if not news_item['deleted']:
@@ -63,7 +67,7 @@ async def get_all_news():
 
 @app.get('/news/{id}', response_model=NewsDetailResponse)
 async def get_news_by_id(id: int = Path(ge=1)):
-    news_data = load_file('news.json')
+    news_data = load_file(os.getenv("NEWS_FILE"))
     # если в массиве новости новости начинаются с id=1 и в порядке возрастания, иначе поиск циклом
     if len(news_data['news']) < id:
         return JSONResponse(content='No such news', status_code=status.HTTP_404_NOT_FOUND)
