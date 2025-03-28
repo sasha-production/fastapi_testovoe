@@ -24,16 +24,6 @@ def get_comments_by_news_id(news_id: int) -> List[Optional[Dict]]:
     return comments_by_news_id.get(news_id, [])
 
 
-# def get_comments_count_by_id(news_id: int) -> int:
-#     with open('comments.json', encoding='utf-8') as file:
-#         comments_array = json.load(file).get('comments')
-#         comments_count = 0
-#         for comment_info in comments_array:
-#             if comment_info['news_id'] == news_id:
-#                 comments_count += 1
-#         return comments_count
-
-
 @app.on_event('startup')
 async def pre_processing() -> None:
     '''
