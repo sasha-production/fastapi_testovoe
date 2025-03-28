@@ -22,7 +22,7 @@ class Comment(BaseModel):
 
 class ListNewsResponse(BaseModel):
     news: List[News]
-    new_count: int
+    news_count: int
 
 
 class NewsDetailResponse(BaseModel):

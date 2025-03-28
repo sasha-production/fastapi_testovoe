@@ -2,9 +2,9 @@ import fastapi
 import uvicorn
 import json
 from typing import Dict, List, Optional
-from fastapi import Path, status, Depends
+from fastapi import Path, status
 from fastapi.responses import JSONResponse
-from models import NewsDetailResponse, Comment
+from models import NewsDetailResponse, Comment, ListNewsResponse, News
 
 app = fastapi.FastAPI()
 
@@ -16,8 +16,22 @@ def load_file(path: str) -> Dict:
         return json.load(file)
 
 
+def get_comments_by_news_id(news_id: int) -> List[Optional[Dict]]:
+    return comments_by_news_id.get(news_id, [])
+
+
+def get_comments_count_by_id(news_id: int) -> int:
+    with open('comments.json', encoding='utf-8') as file:
+        comments_array = json.load(file).get('comments')
+        comments_count = 0
+        for comment_info in comments_array:
+            if comment_info['news_id'] == news_id:
+                comments_count += 1
+        return comments_count
+
+
 @app.on_event('startup')
-async def pre_processing():
+async def pre_processing() -> None:
     '''
     Предобработка файла с комментариями.
     Формирует хеш-таблицу: ключ - id новости, значение - список из комментариев
@@ -31,33 +45,20 @@ async def pre_processing():
             comments_by_news_id[news_id] = [Comment(**comment_dict)]
 
 
-def get_comments_by_news_id(news_id: int) -> List[Optional[Dict]]:
-    return comments_by_news_id[news_id]
-
-
-def get_comments_count_by_id(news_id: int) -> int:
-    with open('comments.json', encoding='utf-8') as file:
-        comments_array = json.load(file).get('comments')
-        comments_count = 0
-        for comment_info in comments_array:
-            if comment_info['news_id'] == news_id:
-                comments_count += 1
-        return comments_count
-
-
-@app.get('/')
+@app.get('/', response_model=ListNewsResponse)
 async def get_all_news():
-    with open('news.json', encoding='utf-8') as file:
-        news_data = json.load(file)
-
-    news_count = len(news_data.get('news'))
-    for i in range(news_count):
-        if not news_data['news'][i]['deleted']:  ## возвращать необходимо не удаленные записи (поле "deleted")
-            news_id = news_data['news'][i]['id']
-            news_comments = get_comments_count_by_id(news_id)
-            news_data['news'][i]['comments_count'] = news_comments
-
-    return JSONResponse(content=news_data, status_code=status.HTTP_200_OK)
+    news_data = load_file('news.json')
+    news_not_deleted: List[Optional[News]] = []
+    for news_item in news_data['news']:
+        if not news_item['deleted']:
+            news_id = news_item['id']
+            comments_count = len(get_comments_by_news_id(news_id=news_id))
+            news_item['comments_count'] = comments_count
+            news_not_deleted.append(News(**news_item))
+    return {
+        'news': news_not_deleted,
+        'news_count': len(news_not_deleted)
+    }
 
 
 @app.get('/news/{id}', response_model=NewsDetailResponse)
